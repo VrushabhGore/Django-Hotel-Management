@@ -6,7 +6,7 @@ You can view the app here: http://b239c491.ngrok.io
 ## Team Members
 1. Kabir Singh Mann - Two Factor, Port Forwarding, User profiles and app integration
 2. Navin Rai - Reservation System, Database management and app integration
-3. Vrushabh Gore -  Hotel App, Chat app, Deployment server and app integration
+3. Vrushabh Gore -  Hotel App, Chat app, Deployment server and app integration, Port Forwarding.
 
 ## Date 15/03/2019
 
