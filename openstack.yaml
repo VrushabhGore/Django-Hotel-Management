@@ -1,0 +1,293 @@
+
+heat_template_version: 2014-10-16
+
+description: >
+  heat template for openstack api console
+
+parameters:
+
+  image_name:
+    type: string
+    description: Image Name (also determines log-in name)
+    default: "Ubuntu 18.04"
+
+  flavor:
+    type: string
+    description: machine flavor (size)
+    default: "m1.small"
+
+  ssh_key_name:
+    type: string
+    description: OpenStack key name
+    default: "vrushabh-home"
+
+  authkeys_url:
+    type: string
+    description: url of public keys to add to authorized_keys file on bootup, and refresh again once hourly. (multiple urls can be specified, separated by space)
+    default: "https://cisgitlab.ufv.ca/300156954.keys"
+
+  public_net:
+    type: string
+    description: public network
+    default: "ssh-proxy"
+
+  private_net_cidr:
+    type: string
+    default: 10.6.0.0/20
+
+  private_net_allocation_pool_start:
+    type: string
+    default: 10.6.1.1
+
+  private_net_allocation_pool_end:
+    type: string
+    default: 10.6.15.254
+
+  private_net_gateway_ip:
+    type: string
+    default: 10.6.0.1
+
+  OS_USERNAME:
+    type: string
+    description: your openstack loging name
+    default: "vrushabh"
+
+  OS_TENANT_ID:
+    type: string
+    description: get this information from Identity > Projects, the Project ID column
+    default: "vrushabh"
+
+resources:
+
+  nonce:
+    type: OS::Heat::RandomString
+    properties:
+      length: 4
+      sequence: lowercase
+
+  console_secgroup:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: security group console
+      name:
+        list_join: ["-", [{ get_param: 'OS::stack_name'}, {get_resource: nonce }, "console-secgroup"]]
+      rules:
+        - direction: egress
+          protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 0
+          port_range_max: 65535
+        - direction: egress
+          protocol: udp
+          remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 0
+          port_range_max: 65535
+        - direction: ingress
+          protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 22
+          port_range_max: 22
+
+  private_net:
+    type: OS::Neutron::Net
+    properties:
+      name:
+        list_join: ["-", [{ get_param: 'OS::stack_name'}, {get_resource: nonce }, "console-net"]]
+
+  private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name:
+        list_join: ["-", [{ get_param: 'OS::stack_name'}, {get_resource: nonce }, "console-subnet"]]
+      network_id: { get_resource: private_net }
+      cidr: { get_param: private_net_cidr }
+      gateway_ip: { get_param: private_net_gateway_ip }
+      allocation_pools:
+        - start: { get_param: private_net_allocation_pool_start }
+          end: { get_param: private_net_allocation_pool_end }
+
+  console_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info:
+        network: { get_param: public_net }
+
+  console_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: console_router }
+      subnet_id: { get_resource: private_subnet }
+
+  port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: private_net }
+      security_groups: [ { get_resource: console_secgroup } ]
+      fixed_ips: [ { "subnet": { get_resource: private_subnet } } ]
+
+  floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_net }
+      port_id: { get_resource: port}
+
+  host:
+    type: OS::Nova::Server
+    properties:
+      name:
+        list_join: ["-", [{ get_param: 'OS::stack_name'}, {get_resource: nonce }, "console"]]
+      key_name: { get_param: ssh_key_name }
+      config_drive: true
+      image: { get_param: image_name }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: port }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          template: |
+            #cloud-config
+            #
+            package_update: true
+            package_upgrade: true
+
+            hostname: $STACK_NAME
+            manage_etc_hosts: true
+
+            packages:
+              - python-openstackclient
+              - python-heat
+
+            users:
+            - default
+
+            write_files:
+            - owner: root:root
+              path: /root/setup.sh
+              permissions: '0755'
+              content: |
+               #!/bin/bash
+
+                sudo apt update -y
+                sudo apt install -y python3
+                sudo apt install -y git
+                sudo apt install -y python3-pip
+                sudo apt install -y unzip
+                curl https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip > /root/ngrok.zip
+                unzip /root/ngrok.zip -d /root/
+                ./root/ngrok authtoken 'ADD YOUR NGROK TOKEN HERE'
+                pip3 install django
+                cd root/
+                git clone git@cisgitlab.ufv.ca:201901COMP351AB1g02/webdesign-project.git
+                cd webdesign-project
+                pip3 install -r req.txt
+                pip3 install django-crispy-forms
+                pip3 install django_otp
+                pip3 install django-two-factor-auth
+                pip3 install django-otp-yubikey
+                pip3 install django-phone-field
+                pip3 install django-twilio
+                pip3 install Pillow
+                cd django_hotel_management
+                python3 manage.py runserver
+                cd /root
+                ./ngrok http 8000
+
+
+
+            - owner: root:root
+              path: /home/ubuntu/openrc.sh
+              permissions: '0644'
+              content: |
+                #!/bin/bash
+
+                # To use an Openstack cloud you need to authenticate against keystone, which
+                # returns a **Token** and **Service Catalog**.  The catalog contains the
+                # endpoint for all services the user/tenant has access to - including nova,
+                # glance, keystone, swift.
+                #
+                # *NOTE*: Using the 2.0 *auth api* does not mean that compute api is 2.0.  We
+                # will use the 1.1 *compute api*
+                export OS_AUTH_URL=http://controller:5000/v2.0
+
+                # With the addition of Keystone we have standardized on the term **tenant**
+                # as the entity that owns the resources.
+                export OS_TENANT_ID=$OS_TENANT_ID
+                # export OS_TENANT_NAME=
+
+                # In addition to the owning entity (tenant), openstack stores the entity
+                # performing the action as the **user**.
+                export OS_USERNAME="$OS_USERNAME"
+
+                # With Keystone you pass the keystone password.
+                echo "Please enter your OpenStack Password: "
+                read -sr OS_PASSWORD_INPUT
+                export OS_PASSWORD=$OS_PASSWORD_INPUT
+
+                # If your configuration has multiple regions, we set that information here.
+                # OS_REGION_NAME is optional and only valid in certain environments.
+                export OS_REGION_NAME="regionOne"
+                # Don't leave a blank variable, unset it if it was empty
+                if [ -z "$OS_REGION_NAME" ]; then unset OS_REGION_NAME; fi
+            - owner: root:root
+              path: /etc/cron.d/refresh_keys
+              permissions: '0644'
+              content: |
+                # refresh authorized keys every hour
+                0 * * * * root /usr/local/bin/refresh_keys.sh >/dev/null 2>&1
+                # this file requires a newline on the last line
+
+            - owner: root:root
+              path: /usr/local/bin/refresh_keys.sh
+              permissions: '0755'
+              content: |
+                #!/usr/bin/env bash
+                # exit if KEYS_URL is blank
+                export KEYS_URL="$AUTHKEYS_URL"
+                [ -z "$KEYS_URL" ] && exit 0
+
+                # fetch new copy of public keys
+                rm -f /tmp/fetched_keys || exit 1
+                touch /tmp/fetched_keys || exit 1
+                chmod 0600 /tmp/fetched_keys || exit 1
+                curl $KEYS_URL > /tmp/fetched_keys
+                curl https://cisgitlab.ufv.ca/cjanzen.keys >> /tmp/fetched_keys
+
+                # update every authorized_keys file
+                cd /home
+                for fn in * ; do
+                [ -e "${fn}/.ssh/authorized_keys" ] && {
+                    rm -f /tmp/$$authorized_keys
+                    touch /tmp/$$authorized_keys
+                    chmod 0600 /tmp/$$authorized_keys
+                    cat "${fn}/.ssh/authorized_keys" > /tmp/$$authorized_keys
+                    cat /tmp/fetched_keys >> /tmp/$$authorized_keys
+                    sort -u /tmp/$$authorized_keys > "${fn}/.ssh/authorized_keys"
+                    rm -f /tmp/$$authorized_keys
+                }
+                rm -f /tmp/fetched_keys
+                done
+            - owner: root:root
+              path: /root/.ssh/id_ecdsa
+              permissions: '0600'
+              content: |
+                      -----BEGIN RSA PRIVATE KEY-----
+                      ENTER YOUR PRIVATE KEY FOR SSH TuNNEL
+                      -----END RSA PRIVATE KEY-----
+
+            runcmd:
+            - chmod 0700 /root/.ssh
+            - sed -i 's/%/\n/g' /root/.ssh/id_ecdsa
+            - ssh-keyscan cisgitlab.ufv.ca >> /root/.ssh/known_hosts
+            - /bin/echo "198.162.116.2 controller" >> /etc/hosts
+            - /usr/local/bin/refresh_keys.sh
+            - /root/setup.sh
+
+
+
+
+          params:
+            $STACK_NAME: {get_param: 'OS::stack_name'}
+            $AUTHKEYS_URL : {get_param: authkeys_url }
+            $OS_TENANT_ID : {get_param: OS_TENANT_ID }
+            $OS_USERNAME : {get_param: OS_USERNAME }

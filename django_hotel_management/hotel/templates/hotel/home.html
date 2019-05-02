@@ -1,0 +1,16 @@
+{% extends "hotel/base.html" %}
+{% block reservation%}
+    {% for  reservation in reservations%}
+    <article class="media content-section">
+<div class="media-body">
+<div class="article-metadata">
+  <a class="mr-2" href={% url 'profile' %}>Name: {{ reservation.name }}</a>
+  <small class="text-muted">{{ reservation.date }}</small>
+</div>
+<h2><a class="article-title" href="#">Occupancy Type: {{ reservation.occupancy_type }}</a></h2>
+<p class="article-content"> Number of Guests: {{ reservation.numberofguest }}</p>
+<p class="article-content"> From: {{ reservation.from_date }} <br>To: {{ reservation.to_date }}</p>
+</div>
+</article>
+    {%endfor%}
+{% endblock reservation %}

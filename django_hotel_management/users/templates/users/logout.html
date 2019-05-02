@@ -1,0 +1,9 @@
+{% extends "hotel/base.html" %}
+{% block reservation %}
+    <h2>Logout was successful </h2>
+      <div class="border-top pt-3">
+        <small class="text-muted">
+          <a href="{% url 'two_factor:login' %}">Log In</a></small>
+      </div>
+
+{% endblock reservation %}

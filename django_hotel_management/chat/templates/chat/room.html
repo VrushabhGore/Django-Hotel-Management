@@ -1,0 +1,122 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,600,700,300' rel='stylesheet' type='text/css'>
+    <script src="https://use.typekit.net/hoy3lrg.js"></script>
+    <script>try{Typekit.load({ async: true });}catch(e){}</script>
+    <link rel='stylesheet prefetch' href='https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css'>
+    <link rel='stylesheet prefetch' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.2/css/font-awesome.min.css'>
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+    <link rel="stylesheet" href="{% static 'style.css' %}" />
+  </head>
+
+<body>
+  <div id="frame">
+    <div class="content">
+      <div class="contact-profile">
+        <img src="http://emilcarlsson.se/assets/harveyspecter.png" alt="" />
+        <p>{{ username }}</p>
+      </div>
+      <div class="messages">
+        <ul id="chat-log">
+          {% comment %} <li class="sent">
+            <img src="http://emilcarlsson.se/assets/mikeross.png" alt="" />
+            <p>How the hell am I supposed to get a jury to believe you when I am not even sure that I do?!</p>
+          </li>
+          <li class="replies">
+            <img src="http://emilcarlsson.se/assets/harveyspecter.png" alt="" />
+            <p>When you're backed against the wall, break the god damn thing down.</p>
+          </li> {% endcomment %}
+        </ul>
+      </div>
+      <div class="message-input">
+        <div class="wrap">
+        <input id="chat-message-input" type="text" placeholder="Write your message..." />
+        <i class="fa fa-paperclip attachment" aria-hidden="true"></i>
+        <button id="chat-message-submit" class="submit">
+          <i class="fa fa-paper-plane" aria-hidden="true"></i>
+        </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="{% static 'main.js' %}"></script>
+<script src="{% static 'reconnecting-websocket.js' %}"></script>
+<script>
+    var roomName = {{ room_name_json }};
+    var username = {{ username }};
+
+    var chatSocket = new ReconnectingWebSocket(
+        'ws://' + window.location.host +
+        '/ws/chat/' + roomName + '/');
+
+    chatSocket.onopen = function(e) {
+      fetchMessages();
+    }
+
+    chatSocket.onmessage = function(e) {
+        var data = JSON.parse(e.data);
+        if (data['command'] === 'messages') {
+          for (let i=0; i<data['messages'].length; i++) {
+            createMessage(data['messages'][i]);
+          }
+        } else if (data['command'] === 'new_message'){
+          createMessage(data['message']);
+        }
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    document.querySelector('#chat-message-input').onkeyup = function(e) {
+        if (e.keyCode === 13) {  // enter, return
+            document.querySelector('#chat-message-submit').click();
+        }
+    };
+
+    document.querySelector('#chat-message-submit').onclick = function(e) {
+        var messageInputDom = document.getElementById('chat-message-input');
+        var message = messageInputDom.value;
+        chatSocket.send(JSON.stringify({
+            'command': 'new_message',
+            'message': message,
+            'from': username
+        }));
+
+        messageInputDom.value = '';
+    };
+
+    function fetchMessages() {
+      chatSocket.send(JSON.stringify({'command': 'fetch_messages' }));
+    }
+
+    function createMessage(data) {
+      var author = data['author'];
+      var msgListTag = document.createElement('li');
+      var imgTag = document.createElement('img');
+      var pTag = document.createElement('p');
+      pTag.textContent = data.content;
+      imgTag.src = 'http://emilcarlsson.se/assets/mikeross.png';
+
+      if (author === username) {
+        msgListTag.className = 'sent';
+      } else {
+        msgListTag.className = 'replies';
+      }
+      msgListTag.appendChild(imgTag);
+      msgListTag.appendChild(pTag);
+      document.querySelector('#chat-log').appendChild(msgListTag);
+    }
+
+</script>
+</body>
+
+</html>

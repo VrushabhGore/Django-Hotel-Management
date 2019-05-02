@@ -1,0 +1,21 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Doctor Python Hotel</title>
+</head>
+<body>
+<h2>Welcome to Doctor Python Hotel</h2>
+
+<form action="/thankyou/" method="post">
+    {% csrf_token %}
+    <table>
+    {{form.as_table}}
+
+ </table>
+<input type="submit" value="Book Now" />
+</form>
+</body>
+</html>
+
