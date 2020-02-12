@@ -19,7 +19,7 @@ constantly==15.1.0
 cryptography==2.6.1
 cymem==2.0.2
 daphne==2.2.5
-Django==2.1.7
+Django==2.2.10
 django-crispy-forms==1.7.2
 django-formtools==2.1
 django-otp==0.6.0
