@@ -43,7 +43,7 @@ numpy==1.16.2
 pandas==0.24.2
 phonenumberslite==8.10.10
 pigar==0.9.1
-Pillow==5.4.1
+Pillow==9.0.1
 Pint==0.9
 plac==0.9.6
 preshed==2.0.1
