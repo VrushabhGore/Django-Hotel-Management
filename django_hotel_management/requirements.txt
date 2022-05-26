@@ -71,7 +71,7 @@ srsly==0.0.5
 thinc==7.0.4
 tqdm==4.31.1
 twilio==6.26.0
-Twisted==18.9.0
+Twisted==22.4.0
 txaio==18.8.1
 urllib3>=1.24.2
 wasabi==0.2.1
