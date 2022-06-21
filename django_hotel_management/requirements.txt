@@ -39,7 +39,7 @@ msgpack==0.6.1
 murmurhash==1.0.2
 ngrok==0.0.1
 nltk==3.4
-numpy==1.16.2
+numpy==1.22.0
 pandas==0.24.2
 phonenumberslite==8.10.10
 pigar==0.9.1
